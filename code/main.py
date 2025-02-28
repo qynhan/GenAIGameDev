@@ -7,7 +7,6 @@ from groups import AllSprites
 
 from random import randint
 
-print("Started running main.py")
 
 class Game:
     def __init__(self):
@@ -44,9 +43,6 @@ class Game:
         for obj in map.get_layer_by_name('Entities'):
             if obj.name == 'Player':
                 self.player = Player((obj.x, obj.y), self.all_sprites, self.collision_sprites)
-                print(f"Player created at position: {obj.x}, {obj.y}")
-                print(f"Player rect: {self.player.rect}")
-                print(f"Player hitbox rect: {self.player.hitbox_rect}")
                     
 
     def run(self):
