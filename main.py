@@ -9,7 +9,6 @@ class Game:
         print("initializing the game, in Game constructor")
         # setup
         pygame.init()
-        pygame.event.get()
         self.display_surface = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
         pygame.display.set_caption('Survivor')
         self.clock = pygame.time.Clock()
@@ -37,6 +36,7 @@ class Game:
             self.all_sprites.update(dt)
 
             # draw
+            self.display_surface.fill('black')
             self.all_sprites.draw(self.display_surface)
             pygame.display.update()
         pygame.quit()
