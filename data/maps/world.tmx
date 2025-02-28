@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.10.1" orientation="orthogonal" renderorder="right-down" width="52" height="50" tilewidth="64" tileheight="64" infinite="0" nextlayerid="5" nextobjectid="175">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="52" height="50" tilewidth="64" tileheight="64" infinite="0" nextlayerid="5" nextobjectid="175">
  <tileset firstgid="1" source="../tilesets/world_tileset.tsx"/>
  <tileset firstgid="211" source="../tilesets/Objects.tsx"/>
  <layer id="1" name="Ground" width="52" height="50">
@@ -150,19 +150,19 @@
   <object id="68" name="Enemy" x="1986.67" y="1429.33">
    <point/>
   </object>
-  <object id="69" x="1064" y="1513.33">
+  <object id="69" name="Enemy" x="1064" y="1513.33">
    <point/>
   </object>
-  <object id="70" x="1272" y="2018.67">
+  <object id="70" name="Enemy" x="1272" y="2018.67">
    <point/>
   </object>
-  <object id="71" x="1618.67" y="1912">
+  <object id="71" name="Enemy" x="1618.67" y="1912">
    <point/>
   </object>
-  <object id="72" x="1473.33" y="1220">
+  <object id="72" name="Enemy" x="1473.33" y="1220">
    <point/>
   </object>
-  <object id="73" x="1140" y="1122.67">
+  <object id="73" name="Enemy" x="1140" y="1122.67">
    <point/>
   </object>
  </objectgroup>

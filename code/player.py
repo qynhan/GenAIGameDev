@@ -16,7 +16,9 @@ class Player(pygame.sprite.Sprite):
         keys = pygame.key.get_pressed()
         self.direction.x = int(keys[pygame.K_RIGHT]) - int(keys[pygame.K_LEFT])
         self.direction.y = int(keys[pygame.K_DOWN]) - int(keys[pygame.K_UP])
-        self.direction = self.direction.normalize() if self.direction else self.direction
+
+        if self.direction.x != 0 and self.direction.y != 0:
+            self.direction = self.direction.normalize()
 
     def move(self, dt):
         self.hitbox_rect.x += self.direction.x * self.speed * dt
