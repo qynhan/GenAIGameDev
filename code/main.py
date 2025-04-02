@@ -1,4 +1,5 @@
 import threading  # Add threading for asynchronous API calls
+import time  # Add time module for rate-limiting
 
 # import backend
 from settings import *
@@ -12,7 +13,18 @@ from random import randint, choice
 from google import genai
 import os
 from dotenv import load_dotenv
-import json  
+import json
+from pydantic import BaseModel, conlist
+from typing import List, Tuple, Union
+
+
+class Move(BaseModel):
+    x: int
+    y: int
+
+
+class MoveList(BaseModel):
+    moves: List[Move]
 
 class Game:
     def __init__(self):
@@ -59,6 +71,10 @@ class Game:
         self.load_images()
         self.setup()
         self.enemy_moves = []  # Initialize precomputed moves for enemies
+        self.api_call_timestamps = []  # Track API call timestamps
+        self.api_lock = threading.Lock()  # Lock for thread-safe access
+        self.threads = []  # Store threads for proper management
+        self.stop_threads = False  # Signal to stop threads
 
         
         
@@ -121,11 +137,16 @@ class Game:
                     bullet.kill()
     
     def player_collision(self):
+        """Check if the player collides with any enemy."""
         if pygame.sprite.spritecollide(self.player, self.enemy_sprites, False, pygame.sprite.collide_mask):
+            # print("[DEBUG] Player collided with an enemy. Stopping game.")
             self.running = False
+            self.stop_threads = True  # Signal threads to stop
+            return True  # Indicate that a collision occurred
+        return False
 
     def calc_next_enemy_move(self, num_moves=50):
-        """Calculate the next `num_moves` moves for each enemy using the Gemini API."""
+        """Calculate the next `num_moves` moves for each enemy using the Gemini API with JSON schema."""
         # Prepare data to send to Gemini
         enemy_positions = [(enemy.rect.centerx, enemy.rect.centery) for enemy in self.enemy_sprites]
 
@@ -154,48 +175,136 @@ class Game:
             "num_moves": num_moves
         }
 
-        # Call Gemini API
+        # Define the schema explicitly as a dictionary
+        move_schema = {
+            "type": "object",
+            "properties": {
+                "x": {"type": "integer"},
+                "y": {"type": "integer"}
+            },
+            "required": ["x", "y"]
+        }
+
+        move_list_schema = {
+            "type": "object",
+            "properties": {
+                "moves": {
+                    "type": "array",
+                    "items": move_schema
+                }
+            },
+            "required": ["moves"]
+        }
+
+        schema_dict = {
+            "type": "array",
+            "items": move_list_schema
+        }
+
+        # Call Gemini API with retry logic
         client = genai.Client(api_key=self.gemini_api_key)
-        try:
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=f"Given the following data:\n"
-                         f"Enemy positions: {enemy_positions}\n"
-                         f"Player position: {player_position}\n"
-                         f"Map layout: {map_layout}\n"
-                         f"Calculate the next {num_moves} optimal positions for the enemies to navigate toward the player while avoiding obstacles. "
-                         f"Return the result as a JSON list of lists where each sublist contains the next positions of all enemies.",
-            )
-            # Clean the response
-            response_text = response.text.strip()
-            if response_text.startswith("```json"):
-                response_text = response_text[7:-3].strip()  # Remove ```json and trailing ```
-            
-            # Parse the response
-            next_moves = json.loads(response_text)  # Safely parse JSON response
-            return next_moves
-        except json.JSONDecodeError:
-            print("Invalid JSON response from Gemini API:", response.text)
-            return None
-        except Exception as e:
-            print(f"Error calling Gemini API: {e}")
-            return None
+        retries = 3
+        for attempt in range(retries):
+            try:
+                print(f"[DEBUG] Sending request to Gemini API (Attempt {attempt + 1}).")
+                # Simplified prompt
+                prompt = f"""Given the following data:\n
+                             Enemy positions: {enemy_positions}\n
+                             Player position: {player_position}\n
+                             Map layout: {map_layout}\n
+                             Calculate the next {num_moves} optimal positions for the enemies to navigate toward the player while avoiding obstacles. 
+                             Return the result as a JSON list of MoveList objects."""
+
+                response = client.models.generate_content(
+                    model="gemini-1.5-flash",
+                    contents=prompt,
+                    config={
+                        'response_mime_type': 'application/json',
+                        'response_schema': schema_dict,
+                    }
+                )
+                print("[DEBUG] Received raw response from Gemini API:", response.text)
+
+                # Attempt to parse the entire response as a list of MoveList objects
+                try:
+                    data = json.loads(response.text)
+                    if isinstance(data, list):
+                        # Use Pydantic to parse the data
+                        move_lists = [MoveList.parse_obj(item) for item in data]
+
+                        next_moves = [[(move.x, move.y) for move in move_list.moves] for move_list in move_lists]
+                        print("[DEBUG] Received enemy moves from Gemini API successfully.")
+                        return next_moves
+                    else:
+                        print("[DEBUG] Response is not a list:", data)
+                        return None
+                except json.JSONDecodeError as e:
+                    print(f"[DEBUG] JSONDecodeError: {e}")
+                    print(f"[DEBUG] Raw response: {response.text}")
+                    return None
+                except Exception as e:
+                    print(f"[DEBUG] Pydantic parsing error: {e}")
+                    return None
+
+            except Exception as e:
+                print(f"[DEBUG] Error calling Gemini API: {e}")
+                if "502" in str(e) and attempt < retries - 1:
+                    print("[DEBUG] Retrying due to server error...")
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                else:
+                    return None
+
+        print("[DEBUG] All retry attempts failed.")
+        return None
 
     def async_calc_next_enemy_moves(self, num_moves=50):
-        """Fetch the next `num_moves` moves asynchronously."""
+        """Fetch the next `num_moves` moves asynchronously with rate-limiting."""
         def fetch_moves():
-            new_moves = self.calc_next_enemy_move(num_moves)
-            if new_moves:
-                self.enemy_moves = new_moves
-            else:
-                print("API response delayed or invalid. Falling back to simple logic.")
-                self.fallback_enemy_moves(num_moves)
+            # print("[DEBUG] Thread started for fetching enemy moves.")
+            while not self.stop_threads:  # Check stop signal
+                # Rate-limiting logic
+                current_time = time.time()
+                with self.api_lock:  # Ensure thread-safe access
+                    self.api_call_timestamps = [
+                        t for t in self.api_call_timestamps if current_time - t < 60
+                    ]  # Keep only timestamps within the last 60 seconds
 
-        thread = threading.Thread(target=fetch_moves)
+                    if len(self.api_call_timestamps) >= 15:
+                        # print("[DEBUG] Rate limit reached. Falling back to simple logic.")
+                        self.fallback_enemy_moves(num_moves)
+                        return
+
+                    # Proceed with API call
+                    self.api_call_timestamps.append(current_time)
+
+                # print("[DEBUG] Making API call to calculate enemy moves.")
+                new_moves = self.calc_next_enemy_move(num_moves)
+                if self.stop_threads:  # Exit immediately if stop signal is set
+                    # print("[DEBUG] Stop signal received. Exiting thread.")
+                    return
+                if new_moves:
+                    # print("[DEBUG] Successfully fetched enemy moves from API.")
+                    self.enemy_moves = new_moves
+                else:
+                    # print("[DEBUG] API response delayed or invalid. Falling back to simple logic.")
+                    self.fallback_enemy_moves(num_moves)
+                break  # Exit the loop after fetching moves
+            # print("[DEBUG] Thread exiting.")
+
+        if self.stop_threads:  # Avoid creating new threads if stop signal is set
+            # print("[DEBUG] Stop signal set. Not starting new thread.")
+            return
+
+        thread = threading.Thread(target=fetch_moves, daemon=True)  # Mark thread as daemon
+        self.threads.append(thread)
+        # print("[DEBUG] Starting new thread for enemy move calculation.")
         thread.start()
 
     def fallback_enemy_moves(self, num_moves):
         """Generate simple fallback moves for enemies."""
+        if self.stop_threads:  # Exit immediately if stop signal is set
+            # print("[DEBUG] Stop signal received. Exiting fallback logic.")
+            return
         self.enemy_moves = []  # Reset enemy moves
         for enemy in self.enemy_sprites:
             moves = []
@@ -243,25 +352,31 @@ class Game:
         return map_width, map_height
 
     def run(self):
+        # print("[DEBUG] Game loop started.")
         while self.running:
             # dt
             dt = self.clock.tick() / 1000
+            # print(f"[DEBUG] Frame time: {dt:.4f} seconds.")
 
             # event loop
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    # print("[DEBUG] Quit event detected. Stopping game.")
                     self.running = False
                 if event.type == self.enemy_event:
+                    # print("[DEBUG] Spawning new enemy.")
                     Enemy(choice(self.spawn_positions), choice(list(self.enemy_frames.values())), (self.all_sprites, self.enemy_sprites), self.player, self.collision_sprites)
 
             # Use precomputed moves or fetch new ones if needed
             if not self.enemy_moves or len(self.enemy_moves[0]) == 0:
-                self.async_calc_next_enemy_moves(num_moves=50)
+                # print("[DEBUG] No precomputed moves available. Fetching new moves.")
+                self.async_calc_next_enemy_moves(50)
 
             if self.enemy_moves:
                 for enemy, moves in zip(self.enemy_sprites, self.enemy_moves):
                     if moves:
                         next_pos = moves.pop(0)
+                        # print(f"[DEBUG] Moving enemy to position: {next_pos}.")
                         enemy.rect.center = next_pos
 
             # update
@@ -269,12 +384,23 @@ class Game:
             self.input()
             self.all_sprites.update(dt)
             self.bullet_collision()
-            self.player_collision()
+            if self.player_collision():  # Exit immediately if a collision occurs
+                # print("[DEBUG] Exiting game loop due to player collision.")
+                break
 
             # draw
             self.display_surface.fill('black')
             self.all_sprites.draw(self.player.rect.center)
             pygame.display.update()
+
+        # Signal threads to stop and wait for them to exit
+        # print("[DEBUG] Stopping all threads.")
+        self.stop_threads = True
+        for thread in self.threads:
+            if thread.is_alive():
+                # print("[DEBUG] Waiting for thread to finish.")
+                thread.join(timeout=1)  # Use a timeout to prevent indefinite blocking
+        print("[DEBUG] Exiting game. Cleaning up.")
         pygame.quit()
 
 if __name__ == '__main__':
