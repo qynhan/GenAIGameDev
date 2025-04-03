@@ -364,19 +364,25 @@ class Game:
         return map_width, map_height
 
     def draw_game_over_screen(self):
-        """Draw the game over screen with final coin count and a restart button."""
+        """Draw the game over screen with final coin count, high score, and a restart button."""
         self.display_surface.fill('black')
         
         # Draw final score
         score_text = f"Final Coins: {self.coin_manager.coins_collected}"
         score_surf = self.font.render(score_text, True, 'white')
-        score_rect = score_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2 + 80))
+        score_rect = score_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2 - 40))
         self.display_surface.blit(score_surf, score_rect)
+        
+        # Draw high score
+        high_score_text = f"High Score: {self.coin_manager.high_score}"
+        high_score_surf = self.font.render(high_score_text, True, 'white')
+        high_score_rect = high_score_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2 + 10))
+        self.display_surface.blit(high_score_surf, high_score_rect)
         
         # Draw restart button
         button_width, button_height = 200, 50
         button_x = (WINDOW_WIDTH - button_width) // 2
-        button_y = WINDOW_HEIGHT // 2 + 150
+        button_y = WINDOW_HEIGHT // 2 + 100
         button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
         pygame.draw.rect(self.display_surface, 'white', button_rect)
         
