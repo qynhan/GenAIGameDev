@@ -60,6 +60,7 @@ class Game:
         self.enemy_event = pygame.event.custom_type()
         pygame.time.set_timer(self.enemy_event, 300)
         self.spawn_positions = []
+        self.MIN_SPAWN_DISTANCE = TILE_SIZE * 5  # Minimum distance from player for enemy spawn
 
         # audio
         self.shoot_sound = pygame.mixer.Sound(join('audio', 'shoot.wav'))
@@ -381,8 +382,28 @@ class Game:
                     # print("[DEBUG] Quit event detected. Stopping game.")
                     self.running = False
                 if event.type == self.enemy_event:
-                    # print("[DEBUG] Spawning new enemy.")
-                    Enemy(choice(self.spawn_positions), choice(list(self.enemy_frames.values())), (self.all_sprites, self.enemy_sprites), self.player, self.collision_sprites)
+                    # Generate enemy at a valid position
+                    spawn_position = None
+                    attempts = 5
+                    for _ in range(attempts):
+                        candidate_position = choice(self.spawn_positions)
+                        distance_to_player = pygame.math.Vector2(
+                            candidate_position[0] - self.player.rect.centerx,
+                            candidate_position[1] - self.player.rect.centery
+                        ).length()
+                        
+                        if distance_to_player >= self.MIN_SPAWN_DISTANCE:
+                            spawn_position = candidate_position
+                            break
+                            
+                    if spawn_position:
+                        Enemy(
+                            spawn_position,
+                            choice(list(self.enemy_frames.values())),
+                            (self.all_sprites, self.enemy_sprites),
+                            self.player,
+                            self.collision_sprites
+                        )
 
             # Use precomputed moves or fetch new ones if needed
             if not self.enemy_moves or len(self.enemy_moves[0]) == 0:
