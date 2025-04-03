@@ -191,30 +191,6 @@ class CoinManager:
             map_layout[(grid_x, grid_y)] = 1  # Obstacle
         return map_layout
 
-    def check_achievement(self):
-        """Check if the player has unlocked the 10 coins achievement."""
-        if self.coins_collected == 10:
-            # Pause enemy moves and API calls
-            self.player.game.stop_threads = True  # Signal threads to stop temporarily
-            
-            self.display_surface.fill('black')
-            
-            # Display achievement text
-            achievement_text = "10 Coins! Achievement Unlocked!"
-            achievement_surf = self.font.render(achievement_text, True, 'white')
-            achievement_rect = achievement_surf.get_rect(center=(self.window_width // 2, self.window_height // 2))
-            self.display_surface.blit(achievement_surf, achievement_rect)
-            
-            pygame.display.update()
-            pygame.time.wait(3000)  # Show for 3 seconds
-            
-            # Increase monster speed
-            for enemy in self.player.game.enemy_sprites:
-                enemy.speed = 250  # Update speed to 250
-            
-            # Resume enemy moves and API calls
-            self.player.game.stop_threads = False  # Allow threads to restart
-
     def collect_coins(self):
         """Check if the player collects any coins."""
         collected_coins = pygame.sprite.spritecollide(self.player, self.coin_sprites, True, pygame.sprite.collide_mask)
@@ -223,7 +199,6 @@ class CoinManager:
             self.coins_collected += len(collected_coins)
             print(f"[DEBUG] Coins collected this session: {self.coins_collected}")
             self.update_high_score()  # Update high score after collecting coins
-            self.check_achievement()  # Check for achievement after collecting coins
 
     def draw_coin_tracker(self):
         """Draw the coin tracker and high score at the bottom of the screen."""
