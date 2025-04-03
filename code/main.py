@@ -7,6 +7,7 @@ from player import Player
 from sprites import *
 from pytmx.util_pygame import load_pygame
 from groups import AllSprites
+from coin import CoinManager
 
 from random import randint, choice
 
@@ -42,6 +43,7 @@ class Game:
         if not self.gemini_api_key:
             raise ValueError("GEMINI_API_KEY environment variable not set.")
         
+        self.font = pygame.font.Font(None, 36)  # Add this line before using self.font
 
         # groups
         self.all_sprites = AllSprites()
@@ -76,7 +78,16 @@ class Game:
         self.threads = []  # Store threads for proper management
         self.stop_threads = False  # Signal to stop threads
 
-        
+        # Coin manager
+        self.coin_manager = CoinManager(
+            player=self.player,
+            display_surface=self.display_surface,
+            font=self.font,
+            tile_size=TILE_SIZE,
+            window_width=WINDOW_WIDTH,
+            window_height=WINDOW_HEIGHT,
+            all_sprites=self.all_sprites  # Pass all_sprites group to CoinManager
+        )
         
     def load_images(self):
         self.bullet_surf =  pygame.image.load(join('images', 'gun', 'bullet.png')).convert_alpha()
@@ -206,7 +217,7 @@ class Game:
         retries = 3
         for attempt in range(retries):
             try:
-                print(f"[DEBUG] Sending request to Gemini API (Attempt {attempt + 1}).")
+                # print(f"[DEBUG] Sending request to Gemini API (Attempt {attempt + 1}).")
                 # Simplified prompt
                 prompt = f"""Given the following data:\n
                              Enemy positions: {enemy_positions}\n
@@ -223,7 +234,7 @@ class Game:
                         'response_schema': schema_dict,
                     }
                 )
-                print("[DEBUG] Received raw response from Gemini API:", response.text)
+                # print("[DEBUG] Received raw response from Gemini API:", response.text)
 
                 # Attempt to parse the entire response as a list of MoveList objects
                 try:
@@ -233,7 +244,7 @@ class Game:
                         move_lists = [MoveList.parse_obj(item) for item in data]
 
                         next_moves = [[(move.x, move.y) for move in move_list.moves] for move_list in move_lists]
-                        print("[DEBUG] Received enemy moves from Gemini API successfully.")
+                        # print("[DEBUG] Received enemy moves from Gemini API successfully.")
                         return next_moves
                     else:
                         print("[DEBUG] Response is not a list:", data)
@@ -353,10 +364,10 @@ class Game:
 
     def run(self):
         # print("[DEBUG] Game loop started.")
+        self.coin_manager.generate_coins(self.get_camera_offset(), 10)  # Generate initial coins
         while self.running:
             # dt
             dt = self.clock.tick() / 1000
-            # print(f"[DEBUG] Frame time: {dt:.4f} seconds.")
 
             # event loop
             for event in pygame.event.get():
@@ -379,18 +390,26 @@ class Game:
                         # print(f"[DEBUG] Moving enemy to position: {next_pos}.")
                         enemy.rect.center = next_pos
 
+            # Periodic coin generation
+            current_time = pygame.time.get_ticks()
+            if current_time - self.coin_manager.last_coin_generation_time >= self.coin_manager.coin_generation_interval:
+                self.coin_manager.generate_coins(self.get_camera_offset(), 10)
+                self.coin_manager.last_coin_generation_time = current_time
+
             # update
             self.gun_timer()
             self.input()
             self.all_sprites.update(dt)
             self.bullet_collision()
+            self.coin_manager.collect_coins()  # Check for coin collection
             if self.player_collision():  # Exit immediately if a collision occurs
                 # print("[DEBUG] Exiting game loop due to player collision.")
                 break
 
             # draw
             self.display_surface.fill('black')
-            self.all_sprites.draw(self.player.rect.center)
+            self.all_sprites.draw(self.player.rect.center)  # Draw map and enemies
+            self.coin_manager.draw_coin_tracker()  # Keep this to show coin count
             pygame.display.update()
 
         # Signal threads to stop and wait for them to exit
