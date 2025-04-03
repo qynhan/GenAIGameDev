@@ -363,96 +363,129 @@ class Game:
         map_height = map.height * TILE_SIZE
         return map_width, map_height
 
-    def run(self):
-        # print("[DEBUG] Game loop started.")
-        self.coin_manager.generate_coins_with_gemini(
-            self.get_camera_offset(),
-            10,
-            gemini_client=genai.Client,
-            gemini_api_key=self.gemini_api_key
-        )  # Generate initial coins using Gemini API
-
-        while self.running:
-            # dt
-            dt = self.clock.tick() / 1000
-
-            # event loop
+    def draw_game_over_screen(self):
+        """Draw the game over screen with final coin count and a restart button."""
+        self.display_surface.fill('black')
+        
+        # Draw final score
+        score_text = f"Final Coins: {self.coin_manager.coins_collected}"
+        score_surf = self.font.render(score_text, True, 'white')
+        score_rect = score_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2 + 80))
+        self.display_surface.blit(score_surf, score_rect)
+        
+        # Draw restart button
+        button_width, button_height = 200, 50
+        button_x = (WINDOW_WIDTH - button_width) // 2
+        button_y = WINDOW_HEIGHT // 2 + 150
+        button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+        pygame.draw.rect(self.display_surface, 'white', button_rect)
+        
+        button_text = "Restart Game"
+        button_surf = self.font.render(button_text, True, 'black')
+        button_text_rect = button_surf.get_rect(center=button_rect.center)
+        self.display_surface.blit(button_surf, button_text_rect)
+        
+        pygame.display.update()
+        
+        # Wait for user interaction
+        while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    # print("[DEBUG] Quit event detected. Stopping game.")
-                    self.running = False
-                if event.type == self.enemy_event:
-                    # Generate enemy at a valid position
-                    spawn_position = None
-                    attempts = 5
-                    for _ in range(attempts):
-                        candidate_position = choice(self.spawn_positions)
-                        distance_to_player = pygame.math.Vector2(
-                            candidate_position[0] - self.player.rect.centerx,
-                            candidate_position[1] - self.player.rect.centery
-                        ).length()
-                        
-                        if distance_to_player >= self.MIN_SPAWN_DISTANCE:
-                            spawn_position = candidate_position
-                            break
+                    pygame.quit()
+                    exit()
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left mouse button
+                    if button_rect.collidepoint(event.pos):
+                        return  # Exit the method to restart the game
+
+    def run(self):
+        while True:  # Add a loop to allow restarting the game
+            # Reset game state
+            self.__init__()
+            self.coin_manager.generate_coins_with_gemini(
+                self.get_camera_offset(),
+                10,
+                gemini_client=genai.Client,
+                gemini_api_key=self.gemini_api_key
+            )  # Generate initial coins using Gemini API
+
+            while self.running:
+                # dt
+                dt = self.clock.tick() / 1000
+
+                # event loop
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        # print("[DEBUG] Quit event detected. Stopping game.")
+                        self.running = False
+                    if event.type == self.enemy_event:
+                        # Generate enemy at a valid position
+                        spawn_position = None
+                        attempts = 5
+                        for _ in range(attempts):
+                            candidate_position = choice(self.spawn_positions)
+                            distance_to_player = pygame.math.Vector2(
+                                candidate_position[0] - self.player.rect.centerx,
+                                candidate_position[1] - self.player.rect.centery
+                            ).length()
                             
-                    if spawn_position:
-                        Enemy(
-                            spawn_position,
-                            choice(list(self.enemy_frames.values())),
-                            (self.all_sprites, self.enemy_sprites),
-                            self.player,
-                            self.collision_sprites
-                        )
+                            if distance_to_player >= self.MIN_SPAWN_DISTANCE:
+                                spawn_position = candidate_position
+                                break
+                                
+                        if spawn_position:
+                            Enemy(
+                                spawn_position,
+                                choice(list(self.enemy_frames.values())),
+                                (self.all_sprites, self.enemy_sprites),
+                                self.player,
+                                self.collision_sprites
+                            )
 
-            # Use precomputed moves or fetch new ones if needed
-            if not self.enemy_moves or len(self.enemy_moves[0]) == 0:
-                # print("[DEBUG] No precomputed moves available. Fetching new moves.")
-                self.async_calc_next_enemy_moves(50)
+                # Use precomputed moves or fetch new ones if needed
+                if not self.enemy_moves or len(self.enemy_moves[0]) == 0:
+                    # print("[DEBUG] No precomputed moves available. Fetching new moves.")
+                    self.async_calc_next_enemy_moves(50)
 
-            if self.enemy_moves:
-                for enemy, moves in zip(self.enemy_sprites, self.enemy_moves):
-                    if moves:
-                        next_pos = moves.pop(0)
-                        # print(f"[DEBUG] Moving enemy to position: {next_pos}.")
-                        enemy.rect.center = next_pos
+                if self.enemy_moves:
+                    for enemy, moves in zip(self.enemy_sprites, self.enemy_moves):
+                        if moves:
+                            next_pos = moves.pop(0)
+                            # print(f"[DEBUG] Moving enemy to position: {next_pos}.")
+                            enemy.rect.center = next_pos
 
-            # Periodic coin generation
-            current_time = pygame.time.get_ticks()
-            if current_time - self.coin_manager.last_coin_generation_time >= self.coin_manager.coin_generation_interval:
-                self.coin_manager.generate_coins_with_gemini(
-                    self.get_camera_offset(),
-                    10,
-                    gemini_client=genai.Client,
-                    gemini_api_key=self.gemini_api_key
-                )
-                self.coin_manager.last_coin_generation_time = current_time
+                # Periodic coin generation
+                current_time = pygame.time.get_ticks()
+                if current_time - self.coin_manager.last_coin_generation_time >= self.coin_manager.coin_generation_interval:
+                    self.coin_manager.generate_coins_with_gemini(
+                        self.get_camera_offset(),
+                        10,
+                        gemini_client=genai.Client,
+                        gemini_api_key=self.gemini_api_key
+                    )
+                    self.coin_manager.last_coin_generation_time = current_time
 
-            # update
-            self.gun_timer()
-            self.input()
-            self.all_sprites.update(dt)
-            self.bullet_collision()
-            self.coin_manager.collect_coins()  # Check for coin collection
-            if self.player_collision():  # Exit immediately if a collision occurs
-                # print("[DEBUG] Exiting game loop due to player collision.")
-                break
+                # update
+                self.gun_timer()
+                self.input()
+                self.all_sprites.update(dt)
+                self.bullet_collision()
+                self.coin_manager.collect_coins()  # Check for coin collection
+                if self.player_collision():  # Exit immediately if a collision occurs
+                    # print("[DEBUG] Exiting game loop due to player collision.")
+                    break
 
-            # draw
-            self.display_surface.fill('black')
-            self.all_sprites.draw(self.player.rect.center)  # Draw map and enemies
-            self.coin_manager.draw_coin_tracker()  # Keep this to show coin count
-            pygame.display.update()
+                # draw
+                self.display_surface.fill('black')
+                self.all_sprites.draw(self.player.rect.center)  # Draw map and enemies
+                self.coin_manager.draw_coin_tracker()  # Keep this to show coin count
+                pygame.display.update()
 
-        # Signal threads to stop and wait for them to exit
-        # print("[DEBUG] Stopping all threads.")
-        self.stop_threads = True
-        for thread in self.threads:
-            if thread.is_alive():
-                # print("[DEBUG] Waiting for thread to finish.")
-                thread.join(timeout=1)  # Use a timeout to prevent indefinite blocking
-        print("[DEBUG] Exiting game. Cleaning up.")
-        pygame.quit()
+            # Signal threads to stop and wait for them to exit
+            self.stop_threads = True
+            for thread in self.threads:
+                if thread.is_alive():
+                    thread.join(timeout=1)  # Use a timeout to prevent indefinite blocking
+            self.draw_game_over_screen()
 
 if __name__ == '__main__':
     game = Game()
