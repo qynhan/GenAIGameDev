@@ -3,6 +3,8 @@ from random import randint
 import pygame
 from os.path import join
 from settings import *
+import json
+from pytmx.util_pygame import load_pygame
 
 class Coin(pygame.sprite.Sprite):
     """Class for coin objects."""
@@ -54,6 +56,118 @@ class CoinManager:
         thread = threading.Thread(target=fetch_coin_positions, daemon=True)
         self.threads.append(thread)
         thread.start()
+
+    def generate_coins_with_gemini(self, camera_offset, num_coins=10, gemini_client=None, gemini_api_key=None):
+        """Generate coin positions using the Gemini API."""
+        def fetch_coin_positions():
+            while not self.stop_threads:  # Check stop signal
+                if not gemini_client or not gemini_api_key:
+                    print("[DEBUG] Gemini client or API key not provided.")
+                    return
+
+                # Prepare map layout and camera region
+                camera_min_x, camera_min_y = camera_offset
+                camera_max_x = camera_min_x + self.window_width
+                camera_max_y = camera_min_y + self.window_height
+                map_layout = self.get_relevant_map_layout(camera_offset, radius=10)
+
+                # Create the request payload
+                request_data = {
+                    "map_layout": map_layout,
+                    "camera_region": {
+                        "x_min": camera_min_x,
+                        "y_min": camera_min_y,
+                        "x_max": camera_max_x,
+                        "y_max": camera_max_y
+                    },
+                    "num_coins": num_coins
+                }
+
+                # Define the schema for the response
+                coin_schema = {
+                    "type": "object",
+                    "properties": {
+                        "x": {"type": "integer"},
+                        "y": {"type": "integer"}
+                    },
+                    "required": ["x", "y"]
+                }
+
+                schema_dict = {
+                    "type": "array",
+                    "items": coin_schema
+                }
+
+                # Call Gemini API
+                try:
+                    prompt = f"""Given the following data:\n
+                                 Map layout: {map_layout}\n
+                                 Camera region: {request_data['camera_region']}\n
+                                 Generate {num_coins} coin positions in areas without obstacles. 
+                                 Return the result as a JSON list of objects with 'x' and 'y' coordinates."""
+
+                    client = gemini_client(api_key=gemini_api_key)
+                    response = client.models.generate_content(
+                        model="gemini-1.5-flash",
+                        contents=prompt,
+                        config={
+                            'response_mime_type': 'application/json',
+                            'response_schema': schema_dict,
+                        }
+                    )
+
+                    # Parse the response
+                    data = json.loads(response.text)
+                    if isinstance(data, list):
+                        for coin_data in data:
+                            # Add larger randomness to the coin positions
+                            random_offset_x = randint(-self.tile_size, self.tile_size)
+                            random_offset_y = randint(-self.tile_size, self.tile_size)
+                            coin_x = coin_data["x"] + random_offset_x
+                            coin_y = coin_data["y"] + random_offset_y
+
+                            # Ensure the coin stays within the camera region
+                            coin_x = max(camera_min_x, min(coin_x, camera_max_x))
+                            coin_y = max(camera_min_y, min(coin_y, camera_max_y))
+
+                            coin = Coin((coin_x, coin_y), self.coin_image, self.coin_sprites)
+                            self.coin_sprites.add(coin)
+                            self.all_sprites.add(coin)  # Add coin to all_sprites group
+                        print("[DEBUG] Coins generated successfully using Gemini API with larger random offsets.")
+                    else:
+                        print("[DEBUG] Invalid response format:", data)
+
+                except Exception as e:
+                    print(f"[DEBUG] Error calling Gemini API for coin generation: {e}")
+                break  # Exit the loop after one successful API call
+
+        thread = threading.Thread(target=fetch_coin_positions, daemon=True)
+        self.threads.append(thread)
+        thread.start()
+
+    def get_relevant_map_layout(self, camera_offset, radius):
+        """Generate a smaller map layout around the camera region."""
+        map_layout = self.get_map_layout()
+        relevant_layout = {}
+        camera_min_x, camera_min_y = camera_offset
+        camera_max_x = camera_min_x + self.window_width
+        camera_max_y = camera_min_y + self.window_height
+
+        for (x, y), value in map_layout.items():
+            if camera_min_x // self.tile_size <= x <= camera_max_x // self.tile_size and \
+               camera_min_y // self.tile_size <= y <= camera_max_y // self.tile_size:
+                relevant_layout[(x, y)] = value
+        return relevant_layout
+
+    def get_map_layout(self):
+        """Generate a grid representation of the map."""
+        map_layout = {}
+        for x, y, _ in load_pygame(join('data', 'maps', 'world.tmx')).get_layer_by_name('Ground').tiles():
+            map_layout[(x, y)] = 0  # Walkable tile
+        for obj in load_pygame(join('data', 'maps', 'world.tmx')).get_layer_by_name('Collisions'):
+            grid_x, grid_y = int(obj.x // self.tile_size), int(obj.y // self.tile_size)
+            map_layout[(grid_x, grid_y)] = 1  # Obstacle
+        return map_layout
 
     def collect_coins(self):
         """Check if the player collects any coins."""

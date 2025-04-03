@@ -364,7 +364,13 @@ class Game:
 
     def run(self):
         # print("[DEBUG] Game loop started.")
-        self.coin_manager.generate_coins(self.get_camera_offset(), 10)  # Generate initial coins
+        self.coin_manager.generate_coins_with_gemini(
+            self.get_camera_offset(),
+            10,
+            gemini_client=genai.Client,
+            gemini_api_key=self.gemini_api_key
+        )  # Generate initial coins using Gemini API
+
         while self.running:
             # dt
             dt = self.clock.tick() / 1000
@@ -393,7 +399,12 @@ class Game:
             # Periodic coin generation
             current_time = pygame.time.get_ticks()
             if current_time - self.coin_manager.last_coin_generation_time >= self.coin_manager.coin_generation_interval:
-                self.coin_manager.generate_coins(self.get_camera_offset(), 10)
+                self.coin_manager.generate_coins_with_gemini(
+                    self.get_camera_offset(),
+                    10,
+                    gemini_client=genai.Client,
+                    gemini_api_key=self.gemini_api_key
+                )
                 self.coin_manager.last_coin_generation_time = current_time
 
             # update
