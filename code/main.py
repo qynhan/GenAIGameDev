@@ -33,7 +33,7 @@ class Game:
         # setup
         pygame.init()
         self.display_surface = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-        pygame.display.set_caption('GenAI Survivor Game -- Undergrad Thesis Project')
+        pygame.display.set_caption('GenAI Coin Hunter -- Undergrad Thesis Project')
         self.clock = pygame.time.Clock()
         self.running = True
 
