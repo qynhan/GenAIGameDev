@@ -1,3 +1,35 @@
+# System Context Diagram
+
+```mermaid
+C4Context
+    title System Context Diagram - GenAI Game System
+    
+    %% Layout configuration
+    direction LR
+    
+    %% Core components with spacing
+    Person(player, "Player", "User interaction")
+    
+    System(game, "GenAI Game\nSystem", "Core game engine")
+    
+    System_Ext(gemini, "Google\nGemini API", "AI service")
+    
+    %% Storage components
+    SystemDb_Ext(assets, "Asset\nStorage", "Game resources")
+    
+    SystemDb(local, "Local\nStorage", "Game state")
+    
+    %% Relationships with spacing
+    Rel_R(player, game, "Input")
+    Rel_L(game, player, "Output")
+    
+    Rel_R(game, gemini, "AI Requests")
+    Rel_L(gemini, game, "Decisions")
+    
+    Rel_D(game, assets, "Load")
+    Rel_D(game, local, "Save")
+```
+
 # Game System Class Diagram
 
 ```mermaid
