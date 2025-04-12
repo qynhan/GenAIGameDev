@@ -1,153 +1,122 @@
-# GenAIGameDev
-Undergraduate thesis in researching how using prompt engineering can act as Non-Player-Characters (NPC)
+# GenAI Coin Hunter: Undergraduate Thesis Project
 
-# System Design and Architecture Documentation
+## Overview
 
-## 1. Design Patterns Used
+**GenAI Coin Hunter** is a 2D game developed as part of an undergraduate thesis project. The game integrates **Generative AI** to dynamically generate enemy movements and coin placements, creating a unique and engaging gameplay experience. Built using Python and Pygame, the project demonstrates the potential of combining traditional game development techniques with cutting-edge AI technologies.
 
-### 1.1 Component Pattern
-- **Implementation**: The game is divided into distinct components (Player, Enemy, Coin, Gun) that operate independently.
-- **Rationale**: Enables better maintainability and separation of concerns.
-- **Example**:
-```python
-class Player:
-    def __init__(self, pos, groups, collision_sprites)
-    def input()
-    def move(dt)
-    def update(dt)
+## Features
+
+- **Dynamic Enemy AI**: Enemies use AI-generated paths to navigate toward the player while avoiding obstacles.
+- **Coin Collection System**: Coins are dynamically spawned on the map, and players can collect them to increase their score.
+- **High Score Tracking**: Tracks the player's highest score across sessions.
+- **Asynchronous API Integration**: Uses Google's Gemini AI for real-time enemy movement and coin placement.
+- **Player Feedback Integration**:
+  - Space bar for shooting.
+  - Slower enemy speed for easier gameplay.
+  - Enemies do not spawn near the player.
+  - Coin tracker to display collected coins.
+
+## Technologies Used
+
+- **Programming Language**: Python
+- **Game Framework**: Pygame
+- **AI Integration**: Google Gemini AI
+- **Data Validation**: Pydantic
+- **Map Design**: Tiled Map Editor
+- **Audio Editing**: Audacity
+
+## Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/GenAI-Coin-Hunter.git
+   cd GenAI-Coin-Hunter
+   ```
+
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Set up the environment:
+   - Create a `.env` file in the root directory.
+   - Add your Google Gemini API key:
+     ```
+     GEMINI_API_KEY=your_api_key_here
+     ```
+
+4. Run the game:
+   ```bash
+   python main.py
+   ```
+
+## Gameplay Instructions
+
+- **Movement**: Use `W`, `A`, `S`, `D` or arrow keys to move the player.
+- **Shooting**: Press the `Space` bar to shoot bullets at enemies.
+- **Objective**: Collect as many coins as possible while avoiding enemies.
+- **Game Over**: The game ends when the player collides with an enemy. You can restart the game from the game-over screen.
+
+## Key Features in Detail
+
+### 1. Generative AI Integration
+- **Enemy Movement**: Enemies use AI-generated paths to navigate toward the player while avoiding obstacles.
+- **Coin Placement**: Coins are dynamically placed on the map using AI, ensuring they are accessible and evenly distributed.
+
+### 2. Player Feedback Integration
+- Adjusted controls and gameplay mechanics based on player feedback:
+  - Space bar for shooting instead of the left mouse button.
+  - Slower enemy speed for a more balanced difficulty.
+  - Enemies spawn at a safe distance from the player.
+  - Added a coin tracker to display the number of coins collected.
+
+### 3. High Score Tracking
+- Tracks the highest number of coins collected across all game sessions.
+- Displays the high score on the game-over screen.
+
+### 4. Asynchronous API Calls
+- Uses threading to fetch AI-generated data without interrupting gameplay.
+- Implements rate-limiting and fallback mechanisms to ensure smooth performance.
+
+## File Structure
+
+```
+GenAI-Coin-Hunter/
+├── code/
+│   ├── main.py          # Main game loop and logic
+│   ├── player.py        # Player class and movement logic
+│   ├── sprites.py       # Enemy, bullet, and gun classes
+│   ├── coin.py          # Coin and CoinManager classes
+│   ├── groups.py        # Custom sprite group for rendering
+│   ├── settings.py      # Game settings and constants
+├── data/
+│   ├── maps/            # Tiled map files
+│   ├── images/          # Game assets (player, enemies, coins, etc.)
+│   ├── audio/           # Sound effects and background music
+├── .env                 # Environment variables (API key)
+├── requirements.txt     # Python dependencies
+├── README.md            # Project documentation
 ```
 
-### 1.2 Observer Pattern
-- **Implementation**: The sprite groups system observes and updates all game objects.
-- **Rationale**: Provides efficient management of multiple game entities.
-- **Example**:
-```python
-class AllSprites(pygame.sprite.Group):
-    def draw(self, target_pos)
-    def update(dt)
-```
+## Testing and Validation
 
-### 1.3 State Pattern
-- **Implementation**: Player animation states (up, down, left, right)
-- **Rationale**: Manages complex state transitions cleanly.
-- **Example**:
-```python
-self.frames = {'left': [], 'right': [], 'up': [], 'down': []}
-```
+- **Unit Testing**: Tested individual components like `Player`, `Enemy`, and `CoinManager`.
+- **Integration Testing**: Verified interactions between components, such as bullet collisions and coin collection.
+- **Regression Testing**: Ensured existing features worked after implementing new ones.
+- **Acceptance Testing**: Conducted playtesting sessions to gather feedback and improve gameplay.
 
-## 2. Component Interfaces
+## Future Enhancements
 
-### 2.1 Sprite Interface
-```python
-class pygame.sprite.Sprite:
-    image: Surface  # Visual representation
-    rect: Rect      # Position and collision
-    update(dt)      # Update logic
-```
+- **Obstacle Interaction**: Enemies can hide behind obstacles when under attack.
+- **Multiplayer Mode**: Add support for cooperative or competitive gameplay.
+- **Advanced AI**: Use more sophisticated AI models for enemy behavior.
+- **Level Progression**: Introduce multiple levels with increasing difficulty.
 
-### 2.2 Group Management Interface
-```python
-class AllSprites:
-    display_surface: Surface
-    offset: Vector2
-    draw(target_pos)
-```
+## Acknowledgments
 
-### 2.3 Game Manager Interface
-```python
-class Game:
-    running: bool
-    all_sprites: AllSprites
-    update(dt)
-    draw()
-```
+- **Prof. Mike Katchabaw** for his encouragments and support throughout this project.
 
-## 3. Quality Attributes
 
-### 3.1 Performance
-- **Implementation**: 
-  - Sprite Group optimization for rendering
-  - Asynchronous API calls for enemy movement
-  - Efficient collision detection using spatial partitioning
-- **Example**:
-```python
-def async_calc_next_enemy_moves(self, num_moves=50):
-    thread = threading.Thread(target=fetch_moves, daemon=True)
-```
+---
 
-### 3.2 Usability
-- **Implementation**:
-  - Intuitive controls (WASD/Arrow keys)
-  - Visual feedback for coin collection
-  - Clear game over screen with restart option
-- **Example**:
-```python
-def draw_game_over_screen(self):
-    score_text = f"Final Coins: {self.coins_collected}"
-    button_text = "Restart Game"
-```
-
-### 3.3 Reliability
-- **Implementation**:
-  - Error handling for API calls
-  - Fallback systems for enemy movement
-  - State persistence for high scores
-- **Example**:
-```python
-def fallback_enemy_moves(self, num_moves):
-    # Fallback logic when API fails
-```
-
-### 3.4 Modularity
-- **Implementation**:
-  - Separate classes for different game entities
-  - Clear separation of concerns
-  - Reusable components
-- **Example**: The class diagram shows clear separation of responsibilities
-
-## 4. Design Decisions Rationale
-
-### 4.1 Asynchronous API Integration
-- **Decision**: Use threading for API calls
-- **Rationale**: 
-  - Prevents game freezing during API calls
-  - Maintains smooth gameplay
-  - Handles API rate limiting gracefully
-
-### 4.2 Sprite-based Architecture
-- **Decision**: Use Pygame's sprite system
-- **Rationale**:
-  - Efficient collision detection
-  - Built-in group management
-  - Standard game development practice
-
-### 4.3 Component-based Design
-- **Decision**: Separate game elements into components
-- **Rationale**:
-  - Easier maintenance
-  - Better testing capabilities
-  - Simplified feature additions
-
-### 4.4 State Management
-- **Decision**: Centralized game state in Game class
-- **Rationale**:
-  - Single source of truth
-  - Easier debugging
-  - Simplified state transitions
-
-## 5. Future Considerations
-
-### 5.1 Scalability
-- Support for multiple levels
-- Additional game modes
-- Online multiplayer capabilities
-
-### 5.2 Maintainability
-- Documentation standards
-- Code review processes
-- Testing framework integration
-
-### 5.3 Performance Optimization
-- Asset loading optimization
-- Rendering pipeline improvements
-- Memory management strategies
+Enjoy playing **GenAI Coin Hunter**! If you have any feedback or suggestions, feel free to open an issue or submit a pull request.
